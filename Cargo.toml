@@ -15,4 +15,4 @@ path="src/main.rs"
 # PyO3 library
 [lib]
 crate-type = ["cdylib"]
-name = "pyrustyhtml"
+name = "pyrustymd"

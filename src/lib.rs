@@ -37,7 +37,7 @@ fn parse(input: &str) -> PyResult<PyObject> {
 }
 
 #[pymodule]
-fn pyrustyhtml(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyrustymd(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse, m)?)?;
 
     Ok(())
