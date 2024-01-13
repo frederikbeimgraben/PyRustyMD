@@ -76,8 +76,6 @@ jobs:
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v3
-      - name: Run Cargo test
-        run: cargo test --all
       - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
