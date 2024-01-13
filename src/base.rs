@@ -199,6 +199,8 @@ impl Consumable for Queue {
                         }
 
                         children.push(result.clone());
+
+                        break;
                     },
                     None => {}
                 }

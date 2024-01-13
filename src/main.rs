@@ -7,7 +7,7 @@ pub mod advanced_detectors;
 pub mod types;
 pub mod html;
 
-use crate::advanced_detectors::tag_scope_detector;
+use crate::html::HTMLDetector;
 #[allow(unused_imports)]
 use crate::{
     base::*,
@@ -30,15 +30,15 @@ fn main() {
     // Create a consumable from the joined arguments
     let mut consumable: Queue = Consumable::from_string(joined_args);
 
-    // Create a detector
-    let detector = Detector::TagScopeDetector(
-        tag_scope_detector::TagScopeDetector::new(None, None, None, None, None, None)
-    );
-
     // Consume the consumable
     let result = consumable.consume_any(
         &vec![
-            detector
+            Detector::HTMLDetector(HTMLDetector::DivDetector),
+            Detector::HTMLDetector(HTMLDetector::ParagraphDetector),
+            Detector::HTMLDetector(HTMLDetector::ImgDetector),
+            Detector::HTMLDetector(HTMLDetector::LinkDetector),
+            Detector::HTMLDetector(HTMLDetector::HeadingDetector),
+            Detector::HTMLDetector(HTMLDetector::SpanDetector)
         ]
     );
 

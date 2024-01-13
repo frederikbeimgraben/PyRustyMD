@@ -146,7 +146,7 @@ impl Detectable for TagDetector {
                 // Check if the tag is the correct tag
                 match &self.tag {
                     Some(tag_name) => {
-                        if tag != tag_name.to_string() {
+                        if !tag_name.is_match(tag.as_str()) {
                             return None;
                         }
                     },
