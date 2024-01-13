@@ -128,7 +128,7 @@ impl IntoPy<PyObject> for Value {
 
                 match result.detector {
                     Detector::RawDetector => {
-                        result.content.unwrap_or(Queue::new()).into_py(py)
+                        result.content.unwrap_or(Queue::new()).to_string().into_py(py)
                     },
                     _ => {
                         properties.set(
