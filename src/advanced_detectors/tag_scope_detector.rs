@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::base::*;
 use crate::advanced_detectors::tag_detector::TagDetector;
 use crate::detectors::scope_detector::ScopeDetector;
-use crate::detectors::word_detector::whitespace_detector;
+use crate::detectors::word_detector::{whitespace_detector, WordDetector};
 use crate::types::{Queue, Value, Dict};
 
 #[derive(Debug, Clone)]
@@ -16,11 +16,12 @@ pub struct TagScopeDetector {
     pub class: Option<Vec<String>>,
     pub allow_inner: Option<bool>,
     pub is_standalone: Option<bool>, // Like <img>
-    pub allow_self_closing: Option<bool>
+    pub allow_self_closing: Option<bool>,
+    pub allowed_attributes: Option<Vec<(String, Option<WordDetector>)>>
 }
 
 impl TagScopeDetector {
-    pub fn new(tag: Option<String>, id: Option<String>, class: Option<Vec<String>>, allow_inner: Option<bool>, is_standalone: Option<bool>, allow_self_closing: Option<bool>) -> Self {
+    pub fn new(tag: Option<String>, id: Option<String>, class: Option<Vec<String>>, allow_inner: Option<bool>, is_standalone: Option<bool>, allow_self_closing: Option<bool>, allowed_attributes: Option<Vec<(String, Option<WordDetector>)>>) -> Self {
         Self {
             tag: match tag {
                 Some(tag) => Some(Regex::new(&format!(r"^{}$", tag)).unwrap()),
@@ -30,18 +31,20 @@ impl TagScopeDetector {
             class,
             allow_inner,
             is_standalone,
-            allow_self_closing
+            allow_self_closing,
+            allowed_attributes
         }
     }
 
-    pub fn new_regex(tag: Option<Regex>, id: Option<String>, class: Option<Vec<String>>, allow_inner: Option<bool>, is_standalone: Option<bool>, allow_self_closing: Option<bool>) -> Self {
+    pub fn new_regex(tag: Option<Regex>, id: Option<String>, class: Option<Vec<String>>, allow_inner: Option<bool>, is_standalone: Option<bool>, allow_self_closing: Option<bool>, allowed_attributes: Option<Vec<(String, Option<WordDetector>)>>) -> Self {
         Self {
             tag,
             id,
             class,
             allow_inner,
             is_standalone,
-            allow_self_closing
+            allow_self_closing,
+            allowed_attributes
         }
     }
 }
@@ -58,8 +61,9 @@ impl Detectable for TagScopeDetector {
             self.tag.clone(),
             None,
             Some(false),
+            self.allow_self_closing,
             None,
-            None
+            self.allowed_attributes.clone()
         );
 
         let (start_tag_detected, _, start_tag_result) = queue.clone().consume(&Detector::TagDetector(start_tag_detector));
@@ -68,7 +72,7 @@ impl Detectable for TagScopeDetector {
             return None;
         }
 
-        let attributes;
+        let mut attributes;
         let is_self_closing;
         let tag_name;
 
@@ -92,10 +96,6 @@ impl Detectable for TagScopeDetector {
             None => return None
         }
 
-        if !self.allow_self_closing.unwrap_or(true) && is_self_closing {
-            return None;
-        }
-
         let class = match attributes.get("class") {
             Value::String(class) => class.clone(),
             _ => "".to_string()
@@ -103,7 +103,17 @@ impl Detectable for TagScopeDetector {
 
         let classes_string = class.clone();
 
-        let classes: Vec<Value> = classes_string.split(" ").map(|class| Value::String(class.to_string())).collect();
+        let classes: Vec<Value> = match classes_string.split(" ").map(|class| Value::String(class.to_string())).collect::<Vec<Value>>() {
+            classes => {
+                if classes.len() == 1 && classes[0] == Value::String("".to_string()) {
+                    vec![]
+                } else {
+                    classes
+                }
+            }
+        };
+
+        attributes.set("class", Value::Array(classes.clone()));
 
         let id = match attributes.get("id") {
             Value::String(id) => id.clone(),
@@ -135,7 +145,8 @@ impl Detectable for TagScopeDetector {
                 None,
                 Some(false),
                 Some(true),
-                None
+                None,
+                self.allowed_attributes.clone()
             );
 
             queue.consume(&Detector::TagDetector(start_tag_detector));
@@ -144,7 +155,7 @@ impl Detectable for TagScopeDetector {
                 vec![
                     ("tag".to_string(), &tag_name),
                     ("id".to_string(), &id),
-                    ("classes".to_string(), &classes),
+                    ("class".to_string(), &classes),
                     ("style".to_string(), &style),
                     ("is_self_closing".to_string(), &is_self_closing),
                     ("attributes".to_string(), &attributes)
@@ -161,8 +172,9 @@ impl Detectable for TagScopeDetector {
             Some(tag_name.clone()),
             None,
             Some(false),
+            self.allow_self_closing,
             None,
-            None
+            self.allowed_attributes.clone()
         );
 
         // Inner end detector (for counting inner tags)
@@ -170,6 +182,7 @@ impl Detectable for TagScopeDetector {
             Some(tag_name.clone()),
             None,
             Some(true),
+            None,
             None,
             None
         );
@@ -196,7 +209,7 @@ impl Detectable for TagScopeDetector {
             None => return None
         };
 
-        if !self.allow_inner.unwrap_or(false) && inner.len() > 0 {
+        if !self.allow_inner.unwrap_or(true) && inner.len() > 0 {
             return None;
         }
 

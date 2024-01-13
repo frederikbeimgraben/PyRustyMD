@@ -10,6 +10,13 @@ pub fn span_detector() -> TagScopeDetector {
         None,
         Some(true),
         Some(false),
-        None
+        None,
+        Some(
+            vec![ // style, class, id
+                ("style".to_string(), None),
+                ("class".to_string(), None),
+                ("id".to_string(), None)
+            ]
+        )
     )
 }

@@ -10,6 +10,13 @@ pub fn div_detector() -> TagScopeDetector {
         None,
         None,
         Some(false),
-        None
+        None,
+        Some(
+            vec![ // style, class, id
+                ("style".to_string(), None),
+                ("class".to_string(), None),
+                ("id".to_string(), None)
+            ]
+        )
     )
 }

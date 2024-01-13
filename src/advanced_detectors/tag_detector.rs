@@ -38,7 +38,8 @@ pub struct TagDetector {
     pub has_attributes: Option<bool>,
     pub is_closing: Option<bool>,
     pub is_self_closing: Option<bool>,
-    pub is_opening: Option<bool>
+    pub is_opening: Option<bool>,
+    pub allowed_attributes: Option<Vec<(String, Option<WordDetector>)>>
 }
 
 impl TagDetector {
@@ -47,7 +48,8 @@ impl TagDetector {
         has_attributes: Option<bool>,
         is_closing: Option<bool>,
         is_self_closing: Option<bool>,
-        is_opening: Option<bool>
+        is_opening: Option<bool>,
+        allowed_attributes: Option<Vec<(String, Option<WordDetector>)>>
     ) -> Self {
         Self {
             tag: match tag {
@@ -57,7 +59,8 @@ impl TagDetector {
             has_attributes,
             is_closing,
             is_self_closing,
-            is_opening
+            is_opening,
+            allowed_attributes
         }
     }
 
@@ -66,14 +69,16 @@ impl TagDetector {
         has_attributes: Option<bool>,
         is_closing: Option<bool>,
         is_self_closing: Option<bool>,
-        is_opening: Option<bool>
+        is_opening: Option<bool>,
+        allowed_attributes: Option<Vec<(String, Option<WordDetector>)>>
     ) -> Self {
         Self {
             tag,
             has_attributes,
             is_closing,
             is_self_closing,
-            is_opening
+            is_opening,
+            allowed_attributes
         }
     }
 }
@@ -156,7 +161,7 @@ impl Detectable for TagDetector {
                 // While there are attributes, consume them
                 let attribute_detector = Detector::PropertyDetector(PropertyDetector::new(Some(false), Some(true)));
 
-                let mut attributes: Dict = Dict::new();
+                let mut attributes_pre: Dict = Dict::new();
 
                 loop {
                     let (matched, _, result) = queue.consume(&attribute_detector);
@@ -174,12 +179,12 @@ impl Detectable for TagDetector {
                                     let value = properties.get("value");
 
                                     // Check if the attribute is already defined
-                                    if attributes.has(key.to_str().unwrap().as_str()) {
+                                    if attributes_pre.has(key.to_str().unwrap().as_str()) {
                                         return None;
                                     }
 
                                     // Add the attribute to the list
-                                    attributes.set(
+                                    attributes_pre.set(
                                         key.to_str().unwrap().as_str(),
                                         value
                                     );
@@ -191,13 +196,52 @@ impl Detectable for TagDetector {
                     }
                 }
 
-                if !attributes.empty() {
+                if !attributes_pre.empty() {
                     if self.has_attributes.unwrap_or(true) == false || closing {
                         return None;
                     }
                 } else {
                     if self.has_attributes.unwrap_or(false) == true {
                         return None;
+                    }
+                }
+
+                let mut attributes = Dict::new();
+
+                // Check if the attributes are allowed
+                for (key, value) in attributes_pre.clone().properties {
+                    match &self.allowed_attributes {
+                        Some(allowed_attributes) => {
+                            for (allowed_key, allowed_value) in allowed_attributes {
+                                if *allowed_key == key {
+                                    match allowed_value {
+                                        Some(allowed_value) => {
+                                            match allowed_value.detect(&mut Queue::from_string(value.clone().to_str().unwrap_or("".to_string()))) {
+                                                Some(_) => {
+                                                    attributes.set(
+                                                        key.as_str(),
+                                                        value.clone()
+                                                    );
+                                                },
+                                                None => {}
+                                            }
+                                        },
+                                        None => {
+                                            attributes.set(
+                                                key.as_str(),
+                                                value.clone()
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        None => {
+                            attributes.set(
+                                key.as_str(),
+                                value
+                            );
+                        }
                     }
                 }
 
@@ -462,7 +506,7 @@ mod tests {
     }
 
     fn test_any(queue: &mut Queue, wanted: bool) {
-        let detector = Detector::TagDetector(TagDetector::new(None, None, None, None, None));
+        let detector = Detector::TagDetector(TagDetector::new(None, None, None, None, None, None));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 
@@ -483,8 +527,9 @@ mod tests {
 
         let detector = Detector::TagDetector(
             TagDetector::new(
-                tag.clone(), None, None, None, None
-            ));
+                tag.clone(), None, None, None, None, None
+            )
+        );
 
         let (matched, _, _) = queue.clone().consume(&detector);
 
@@ -498,7 +543,7 @@ mod tests {
     }
 
     fn test_has_attributes(queue: &mut Queue, has_attributes: Option<bool>, wanted: bool) {
-        let detector = Detector::TagDetector(TagDetector::new(None, has_attributes, None, None, None));
+        let detector = Detector::TagDetector(TagDetector::new(None, has_attributes, None, None, None, None));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 
@@ -512,7 +557,7 @@ mod tests {
     }
 
     fn test_is_closing(queue: &mut Queue, is_closing: Option<bool>, wanted: bool) {
-        let detector = Detector::TagDetector(TagDetector::new(None, None, is_closing, None, None));
+        let detector = Detector::TagDetector(TagDetector::new(None, None, is_closing, None, None, None));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 
@@ -526,7 +571,7 @@ mod tests {
     }
 
     fn test_is_self_closing(queue: &mut Queue, is_self_closing: Option<bool>, wanted: bool) {
-        let detector = Detector::TagDetector(TagDetector::new(None, None, None, is_self_closing, None));
+        let detector = Detector::TagDetector(TagDetector::new(None, None, None, is_self_closing, None, None));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 
@@ -540,7 +585,7 @@ mod tests {
     }
 
     fn test_is_opening(queue: &mut Queue, is_opening: Option<bool>, wanted: bool) {
-        let detector = Detector::TagDetector(TagDetector::new(None, None, None, None, is_opening));
+        let detector = Detector::TagDetector(TagDetector::new(None, None, None, None, is_opening, None));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 
@@ -554,7 +599,7 @@ mod tests {
     }
 
     fn test_open_and_close(queue: &mut Queue) {
-        let detector = Detector::TagDetector(TagDetector::new(None, None, Some(true), None, Some(true)));
+        let detector = Detector::TagDetector(TagDetector::new(None, None, Some(true), None, Some(true), None));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 
@@ -568,7 +613,7 @@ mod tests {
     }
 
     fn test_self_closing_and_close(queue: &mut Queue) {
-        let detector = Detector::TagDetector(TagDetector::new(None, None, Some(true), Some(true), None));
+        let detector = Detector::TagDetector(TagDetector::new(None, None, Some(true), Some(true), None, None));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 

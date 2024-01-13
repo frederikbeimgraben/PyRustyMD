@@ -9,10 +9,6 @@ edition = "2021"
 pyo3 = { version = "0.14.2", features = ["extension-module"] }
 regex = "1.10.2"
 
-[[bin]]
-name="parser"
-path="src/main.rs"
-
 # PyO3 library
 [lib]
 crate-type = ["cdylib"]

@@ -1,5 +1,5 @@
-// JSON Types
-// ----------------------------------
+// Types needed for the detection
+// -----------------------------------------------------------------------------------------------
 
 use std::{collections::HashMap, any::Any};
 use crate::base::{Result, Consumable, Detector};
@@ -13,22 +13,6 @@ use pyo3::{IntoPy, Python, PyObject, types::PyDict};
 pub type Token = char;
 pub type Queue = Vec<char>;
 
-// -----------------------------------------------------------------------------------------------
-// JSON Trait
-// -----------------------------------------------------------------------------------------------
-
-pub trait JSON {
-    fn to_json(&self) -> String;
-    fn to_value(&self) -> Value {
-        Value::String(self.to_json())
-    }
-}
-
-// -----------------------------------------------------------------------------------------------
-// Supertraits
-// -----------------------------------------------------------------------------------------------
-
-// Saves a String, a boolean, a number or a Result
 #[derive(Debug, Clone)]
 pub enum Value {
     NoneValue,
@@ -117,30 +101,6 @@ impl PartialEq for Value {
     }
 }
 
-impl JSON for Value {
-    fn to_json(&self) -> String {
-        match self {
-            Self::String(string) => format!("\"{}\"", string),
-            Self::Boolean(boolean) => boolean.to_string(),
-            Self::Float(number) => number.to_string(),
-            Self::Integer(number) => number.to_string(),
-            Self::Result(result) => result.to_json(),
-            Self::Queue(queue) => queue.to_json(),
-            Self::Dict(properties) => properties.to_json(),
-            Self::Array(array) => {
-                let substrings: Vec<String> = array.iter().map(|value| value.to_json()).collect();
-
-                format!("[{}]", substrings.join(","))
-            },
-            Self::NoneValue => String::from("null")
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        self.clone()
-    }
-}
-
 impl IntoPy<PyObject> for Value {
     fn into_py(self, py: Python) -> PyObject {
         match self {
@@ -151,27 +111,10 @@ impl IntoPy<PyObject> for Value {
             Self::Result(result) => {
                 let mut properties = Dict::new();
 
-                if let Some(det_properties) = &result.properties {
-                    for (key, value) in det_properties.clone().properties {
-                        if key == "attributes" {
-                            continue;
-                        }
-                        properties.set(&key, value);
-                    }
-
-                    match det_properties.get("attributes") {
-                        Value::Dict(attributes) => {
-                            for (key, value) in attributes.properties {
-                                if key == "class" || key == "id" || key == "style" {
-                                    continue;
-                                }
-
-                                properties.set(&key, value);
-                            }
-                        },
-                        _ => {}
-                    }
-                }
+                properties.set(
+                    "attributes",
+                    result.get_property("attributes")
+                );
 
                 let children: Vec<Value> = match &result.children {
                     Some(children) => children.iter().map(|child| Value::Result(child.clone())).collect(),
@@ -179,8 +122,13 @@ impl IntoPy<PyObject> for Value {
                 };
 
                 properties.set(
-                    "children",
+                    "content",
                     Value::Array(children)
+                );
+
+                properties.set(
+                    "tag",
+                    result.get_property("tag")
                 );
 
                 match result.detector {
@@ -288,118 +236,19 @@ impl PartialEq for Dict {
     }
 }
 
-impl JSON for Dict {
-    fn to_json(&self) -> String {
-        let mut substrings: Vec<String> = vec![];
-
-        for (key, value) in &self.properties {
-            substrings.push(format!("\"{}\":{}", key, value.to_json()));
-        }
-
-        format!("{{{}}}", substrings.join(","))
-    }
-
-    fn to_value(&self) -> Value {
-        Value::Dict(self.clone())
-    }
-}
-
 impl IntoPy<PyObject> for Dict {
     fn into_py(self, py: Python) -> PyObject {
         let dict = PyDict::new(py);
 
         for (key, value) in self.properties {
-            dict.set_item(key, value.into_py(py)).unwrap();
-        }
-
-        dict.into_py(py)
-    }
-}
-
-// -----------------------------------------------------------------------------------------------
-
-impl JSON for Queue {
-    fn to_json(&self) -> String {
-        // Stringify the queue
-        format!(
-            "\"{}\"",
-            self.to_string()
-        )
-    }
-
-    fn to_value(&self) -> Value {
-        Value::Queue(self.clone())
-    }
-}
-
-impl JSON for Result {
-    fn to_json(&self) -> String {
-        // First convert to a Dict
-        let mut properties = Dict::new();
-
-        if let Some(det_properties) = &self.properties {
-            properties.set("properties", Value::from(det_properties));
-        }
-
-        let children: Vec<Value> = match &self.children {
-            Some(children) => children.iter().map(|child| Value::Result(child.clone())).collect(),
-            None => vec![]
-        };
-
-        let content = match &self.content {
-            Some(content) => Value::Queue(content.clone()),
-            None => Value::NoneValue
-        };
-
-        match self.detector {
-            Detector::RawDetector => {
-                return content.to_json();
-            },
-            _ => {
-                properties.set(
-                    "children",
-                    Value::Array(children)
-                );
+            match value {
+                Value::NoneValue => {},
+                _ => {
+                    dict.set_item(key, value.into_py(py)).unwrap();
+                }
             }
         }
 
-        // Then stringify the Dict
-        properties.to_json()
-    }
-
-    fn to_value(&self) -> Value {
-        Value::Result(self.clone())
-    }
-}
-
-impl JSON for Option<Vec<Result>> {
-    fn to_json(&self) -> String {
-        match self {
-            Some(results) => {
-                let mut substrings: Vec<String> = vec![];
-
-                for result in results {
-                    substrings.push(result.to_json());
-                }
-
-                format!("[{}]", substrings.join(","))
-            },
-            None => String::from("null")
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        match self {
-            Some(results) => {
-                let mut substrings: Vec<Value> = vec![];
-
-                for result in results {
-                    substrings.push(result.to_value());
-                }
-
-                Value::Array(substrings)
-            },
-            None => Value::NoneValue
-        }
+        dict.into_py(py)
     }
 }

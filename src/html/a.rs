@@ -10,6 +10,19 @@ pub fn a_detector() -> TagScopeDetector {
         None,
         None,
         Some(false),
-        None
+        None,
+        Some(
+            vec![ // hreflang, download, target, title, href, name, style, class, id
+                ("hreflang".to_string(), None),
+                ("download".to_string(), None),
+                ("target".to_string(), None),
+                ("title".to_string(), None),
+                ("href".to_string(), None),
+                ("name".to_string(), None),
+                ("style".to_string(), None),
+                ("class".to_string(), None),
+                ("id".to_string(), None)
+            ]
+        )
     )
 }
