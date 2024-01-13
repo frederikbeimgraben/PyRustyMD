@@ -1,6 +1,8 @@
 // Detect a html tag scope
 // -----------------------
 
+use regex::Regex;
+
 use crate::base::*;
 use crate::advanced_detectors::tag_detector::TagDetector;
 use crate::detectors::scope_detector::ScopeDetector;
@@ -9,17 +11,37 @@ use crate::types::{Queue, Value, Dict};
 
 #[derive(Debug, Clone)]
 pub struct TagScopeDetector {
-    pub tag: Option<String>,
+    pub tag: Option<Regex>,
     pub id: Option<String>,
-    pub class: Option<Vec<String>>
+    pub class: Option<Vec<String>>,
+    pub allow_inner: Option<bool>,
+    pub is_standalone: Option<bool>, // Like <img>
+    pub allow_self_closing: Option<bool>
 }
 
 impl TagScopeDetector {
-    pub fn new(tag: Option<String>, id: Option<String>, class: Option<Vec<String>>) -> Self {
+    pub fn new(tag: Option<String>, id: Option<String>, class: Option<Vec<String>>, allow_inner: Option<bool>, is_standalone: Option<bool>, allow_self_closing: Option<bool>) -> Self {
+        Self {
+            tag: match tag {
+                Some(tag) => Some(Regex::new(&format!(r"^{}$", tag)).unwrap()),
+                None => None
+            },
+            id,
+            class,
+            allow_inner,
+            is_standalone,
+            allow_self_closing
+        }
+    }
+
+    pub fn new_regex(tag: Option<Regex>, id: Option<String>, class: Option<Vec<String>>, allow_inner: Option<bool>, is_standalone: Option<bool>, allow_self_closing: Option<bool>) -> Self {
         Self {
             tag,
             id,
-            class
+            class,
+            allow_inner,
+            is_standalone,
+            allow_self_closing
         }
     }
 }
@@ -32,7 +54,7 @@ impl Detectable for TagScopeDetector {
         queue.consume(&whitespace_detector);
 
         // Start Tag: either opening or self-closing
-        let start_tag_detector = TagDetector::new(
+        let start_tag_detector = TagDetector::new_regex(
             self.tag.clone(),
             None,
             Some(false),
@@ -70,6 +92,10 @@ impl Detectable for TagScopeDetector {
             None => return None
         }
 
+        if !self.allow_self_closing.unwrap_or(true) && is_self_closing {
+            return None;
+        }
+
         let class = match attributes.get("class") {
             Value::String(class) => class.clone(),
             _ => "".to_string()
@@ -102,7 +128,7 @@ impl Detectable for TagScopeDetector {
         }
 
         // If self-closing, return result
-        if is_self_closing {
+        if is_self_closing || self.is_standalone.unwrap_or(false) {
             // Consume start tag
             let start_tag_detector = TagDetector::new(
                 Some(tag_name.clone()),
@@ -170,6 +196,10 @@ impl Detectable for TagScopeDetector {
             None => return None
         };
 
+        if !self.allow_inner.unwrap_or(false) && inner.len() > 0 {
+            return None;
+        }
+
         // Fill Result
         let properties = Dict::from(
             vec![
@@ -190,7 +220,10 @@ impl Detectable for TagScopeDetector {
 
 impl PartialEq for TagScopeDetector {
     fn eq(&self, other: &Self) -> bool {
-        self.tag == other.tag &&
+        (
+            self.tag.clone().unwrap_or(Regex::new(r"").ok().unwrap()).as_str() == 
+            other.tag.clone().unwrap_or(Regex::new(r"").ok().unwrap()).as_str()
+        ) &&
         self.id == other.id &&
         self.class == other.class
     }

@@ -20,6 +20,8 @@
 //   - Some(true): Only opening tags will be detected
 //   - Some(false): Only non-opening tags will be detected
 
+use regex::Regex;
+
 use crate::detectors::word_detector::{identifier_detector, whitespace_detector};
 use crate::detectors::{
     scope_detector::ScopeDetector,
@@ -32,7 +34,7 @@ use crate::types::{Queue, Dict};
 
 #[derive(Debug, Clone)]
 pub struct TagDetector {
-    pub tag: Option<String>,
+    pub tag: Option<Regex>,
     pub has_attributes: Option<bool>,
     pub is_closing: Option<bool>,
     pub is_self_closing: Option<bool>,
@@ -42,6 +44,25 @@ pub struct TagDetector {
 impl TagDetector {
     pub fn new(
         tag: Option<String>,
+        has_attributes: Option<bool>,
+        is_closing: Option<bool>,
+        is_self_closing: Option<bool>,
+        is_opening: Option<bool>
+    ) -> Self {
+        Self {
+            tag: match tag {
+                Some(tag) => Some(Regex::new(tag.as_str()).ok().unwrap()),
+                None => None
+            },
+            has_attributes,
+            is_closing,
+            is_self_closing,
+            is_opening
+        }
+    }
+
+    pub fn new_regex(
+        tag: Option<Regex>,
         has_attributes: Option<bool>,
         is_closing: Option<bool>,
         is_self_closing: Option<bool>,
@@ -125,7 +146,7 @@ impl Detectable for TagDetector {
                 // Check if the tag is the correct tag
                 match &self.tag {
                     Some(tag_name) => {
-                        if tag_name != &tag {
+                        if tag != tag_name.to_string() {
                             return None;
                         }
                     },
@@ -235,7 +256,10 @@ impl Detectable for TagDetector {
 
 impl PartialEq for TagDetector {
     fn eq(&self, other: &Self) -> bool {
-        self.tag == other.tag &&
+        (
+            self.tag.clone().unwrap_or(Regex::new(r"").ok().unwrap()).as_str() == 
+            other.tag.clone().unwrap_or(Regex::new(r"").ok().unwrap()).as_str()
+        ) &&
         self.has_attributes == other.has_attributes &&
         self.is_closing == other.is_closing &&
         self.is_self_closing == other.is_self_closing &&
@@ -457,7 +481,10 @@ mod tests {
             None => None
         };
 
-        let detector = Detector::TagDetector(TagDetector::new(tag.clone(), None, None, None, None));
+        let detector = Detector::TagDetector(
+            TagDetector::new(
+                tag.clone(), None, None, None, None
+            ));
 
         let (matched, _, _) = queue.clone().consume(&detector);
 

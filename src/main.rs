@@ -5,6 +5,7 @@ pub mod base;
 pub mod detectors;
 pub mod advanced_detectors;
 pub mod types;
+pub mod html;
 
 use crate::advanced_detectors::tag_scope_detector;
 #[allow(unused_imports)]
@@ -31,7 +32,7 @@ fn main() {
 
     // Create a detector
     let detector = Detector::TagScopeDetector(
-        tag_scope_detector::TagScopeDetector::new(None, None, None)
+        tag_scope_detector::TagScopeDetector::new(None, None, None, None, None, None)
     );
 
     // Consume the consumable

@@ -5,6 +5,8 @@
 
 use std::{fmt::Debug, vec};
 
+use crate::html::HTMLDetector;
+
 use crate::{
     detectors::{
         number_detector::NumberDetector,
@@ -76,6 +78,7 @@ pub enum Detector {
     BooleanDetector(BooleanDetector),
     TagDetector(TagDetector),
     TagScopeDetector(TagScopeDetector),
+    HTMLDetector(HTMLDetector),
     RawDetector,
     NoneDetector
 }
@@ -106,6 +109,7 @@ impl Detectable for Detector {
             Self::BooleanDetector(boolean_detector) => boolean_detector.detect(queue),
             Self::TagDetector(tag_detector) => tag_detector.detect(queue),
             Self::TagScopeDetector(tag_scope_detector) => tag_scope_detector.detect(queue),
+            Self::HTMLDetector(html_detector) => html_detector.detect(queue),
             Self::RawDetector => None,
             Self::NoneDetector => None
         }

@@ -5,12 +5,13 @@ pub mod base;
 pub mod types;
 pub mod detectors;
 pub mod advanced_detectors;
+pub mod html;
 
+use html::HTMLDetector;
 use pyo3::prelude::*;
 
 use types::{Queue, Value};
 use crate::base::*;
-use advanced_detectors::tag_scope_detector::TagScopeDetector;
 
 #[pyfunction]
 fn parse(input: &str) -> PyResult<PyObject> {
@@ -18,7 +19,12 @@ fn parse(input: &str) -> PyResult<PyObject> {
 
     let result = consumable.consume_any(
         &vec![
-            Detector::TagScopeDetector(TagScopeDetector::new(None, None, None))
+            Detector::HTMLDetector(HTMLDetector::DivDetector),
+            Detector::HTMLDetector(HTMLDetector::ParagraphDetector),
+            Detector::HTMLDetector(HTMLDetector::ImgDetector),
+            Detector::HTMLDetector(HTMLDetector::LinkDetector),
+            Detector::HTMLDetector(HTMLDetector::HeadingDetector),
+            Detector::HTMLDetector(HTMLDetector::SpanDetector)
         ]
     );
 
