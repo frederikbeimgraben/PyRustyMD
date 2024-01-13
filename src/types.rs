@@ -122,25 +122,25 @@ impl IntoPy<PyObject> for Value {
                 };
 
                 properties.set(
-                    "content",
-                    Value::Array(children)
-                );
-
-                properties.set(
                     "tag",
                     result.get_property("tag")
                 );
 
                 match result.detector {
                     Detector::RawDetector => {
-                        return result.content.unwrap_or(Queue::new()).to_string().into_py(py);
+                        result.content.unwrap_or(Queue::new()).into_py(py)
                     },
                     _ => {
+                        properties.set(
+                            "content",
+                            Value::Array(children)
+                        );
+
                         properties.into_py(py)
                     }
                 }
             },
-            Self::Queue(queue) => queue.into_py(py),
+            Self::Queue(queue) => queue.to_string().into_py(py),
             Self::Dict(properties) => properties.into_py(py),
             Self::Array(array) => {
                 let mut substrings: Vec<PyObject> = vec![];
