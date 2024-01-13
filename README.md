@@ -4,37 +4,35 @@
 ## Features
 - [ ] Parse Markdown
 - [x] Parse HTML-Style Tags
-- [ ] Allow only certain Tags
-- [ ] Allow only certain Attributes per Tag
+- [x] Allow only certain Tags
+- [x] Allow only certain Attributes per Tag
 - [ ] markdown like additions specific to PixelCampus.space Wiki
 
 Returns a JSON Object like:
 ```json
 [
     {
-        "id": "",
-        "style": "left: 10px;",
-        "classes": [
-            "test",
-            "abc"
-        ],
-        "is_self_closing": false,
-        "tag": "div",
-        "children": [
+        "content": [
             "test",
             {
-                "style": "",
-                "children": [
+                "content": [
                     "test2"
                 ],
-                "id": "spn",
                 "tag": "span",
-                "classes": [
-                    ""
-                ],
-                "is_self_closing": false
+                "attributes": {
+                    "id": "spn",
+                    "class": []
+                }
             }
-        ]
+        ],
+        "tag": "div",
+        "attributes": {
+            "style": "left: 10px;",
+            "class": [
+                "test",
+                "abc"
+            ]
+        }
     }
 ]
 ```
@@ -57,6 +55,9 @@ json = parse("<your html here>")
 ## Development setup
 
 ```sh
+# Create virtualenv
+python3 -m venv .env
+
 # Activate virtualenv
 source .env/bin/activate
 
