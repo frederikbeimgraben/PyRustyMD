@@ -6,6 +6,7 @@ pub mod types;
 pub mod detectors;
 pub mod advanced_detectors;
 pub mod html;
+pub mod md;
 
 use html::HTMLDetector;
 use pyo3::prelude::*;
