@@ -1,7 +1,7 @@
 // Types needed for the detection
 // -----------------------------------------------------------------------------------------------
 
-use std::{collections::HashMap, any::Any, fmt::Debug, fmt::Display, result};
+use std::{collections::HashMap, any::Any, fmt::Debug, fmt::Display};
 
 use pyo3::{IntoPy, Python, PyObject, types::PyDict};
 
@@ -145,7 +145,7 @@ pub enum Flag {
 
 pub trait Detectable: Debug {
     fn detect(&self, queue: &mut Queue) -> Option<(Queue, Tag)>;
-    fn regex(&self, queue: &mut Queue) -> String {
+    fn regex(&self, _: &mut Queue) -> String {
         String::new()
     }
 }
@@ -248,7 +248,7 @@ impl Value {
             },
 
             // Any other type
-            value => Self::NoneValue
+            _ => Self::NoneValue
         }
     }
 

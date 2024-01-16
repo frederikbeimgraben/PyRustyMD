@@ -3,7 +3,7 @@
 // scope of a tag (i.e. the start and end of a tag).
 // =================================
 
-use regex::Regex;
+use fancy_regex::Regex;
 
 use crate::types::*;
 
@@ -47,14 +47,7 @@ impl Detectable for TagScopeDetector {
     fn regex(&self, queue: &mut Queue) -> String {
         // Craft Regex for attributes
         let opening_tag = TagDetector::new_opening(self.name.clone(), self.attributes.clone(), self.allow_self_closing.clone());
-        
-        // Match the opening tag, to get the name
-        let name = match opening_tag.detect(queue) {
-            Some((_, tag)) => tag.name,
-            None => r"^\b$".to_string()
-        };
-        
-        let closing_tag = TagDetector::new_closing(Some(name));
+        let closing_tag = TagDetector::new_closing(Some(String::from(r#"(?P<closingname>\k<name>)"#)));
 
         let opening_regex = opening_tag.regex(&mut queue.clone());
         let closing_regex = closing_tag.regex(&mut queue.clone());
@@ -108,12 +101,15 @@ impl Detectable for TagScopeDetector {
                 regex.captures(queue.as_str())
             },
             Err(_) => {
-                None
+                panic!("Invalid regex: {}", regex)
             },
         };
 
         // Check if there are matches
-        let matches = match matches {
+        let matches = match match matches {
+            Ok(matches) => matches,
+            Err(_) => return None,
+        } {
             Some(matches) => matches,
             None => return None,
         };
@@ -125,12 +121,11 @@ impl Detectable for TagScopeDetector {
         let content = matches.name("content").map(|content| content.as_str().to_string());
 
         // Create tag
-        let mut tag = crate::tag::Tag::init(
+        let tag = crate::tag::Tag::init(
             name, Some(attributes)
         );
 
-        // Drain the tag from the queue
-        queue.drain(matches.get(0).unwrap().range());
+        queue.drain(0..matches.name("closing").unwrap().end());
 
         // Return the tag
         Some((content.unwrap_or(String::new()), tag))

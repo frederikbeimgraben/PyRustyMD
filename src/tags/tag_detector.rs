@@ -4,7 +4,7 @@
 
 // External imports
 /// Regex
-use regex::{Regex, Captures};
+use fancy_regex::{Regex, Captures};
 
 // Crate imports
 use crate::types::*;
@@ -59,7 +59,7 @@ pub fn extract_data(cap: &Captures) -> (String, Dict) {
 }
 
 impl Detectable for TagDetector {
-    fn regex(&self, queue: &mut Queue) -> String {
+    fn regex(&self, _: &mut Queue) -> String {
         // Craft Regex for attributes
         let mut attributes: String = match &self.attributes {
             Some(attributes) => {
@@ -81,7 +81,7 @@ impl Detectable for TagDetector {
 
         let name = match &self.name {
             Some(name) => format!(r#"{}"#, name),
-            None => String::from(r#"(?P<name>[a-zA-Z0-9]+)"#),
+            None => String::from(r#"(?P<name>[a-zA-Z]+[a-zA-Z0-9]*)"#),
         };
 
         // Check if the tag is closing
@@ -92,18 +92,18 @@ impl Detectable for TagDetector {
 
         // Craft Regex
         let regex_opening = format!(
-            r#"<\s?{}{}\s?>"#,
+            r#"(?<tag><\s?{}{}\s?>)"#,
             name,
             attributes
         );
 
         let regex_closing = format!(
-            r#"<\/\s?{}\s?>"#,
+            r#"(?<tag><\/\s?{}\s?>)"#,
             name
         );
 
         let regex_self_closing = format!(
-            r#"<\s?{}\s{}\s?/>"#,
+            r#"(?<tag><\s?{}\s{}\s?/>)"#,
             name,
             attributes
         );
@@ -118,9 +118,9 @@ impl Detectable for TagDetector {
         }
     }
 
-    fn detect(&self, consumable: &mut Queue) -> Option<(String, Tag)> {
+    fn detect(&self, queue: &mut Queue) -> Option<(String, Tag)> {
         // Craft Regex for attributes
-        let regex = self.regex(&mut consumable.clone());
+        let regex = self.regex(&mut queue.clone());
 
         // Enclose to match at start of string
         let regex = format!("^{}", regex);
@@ -129,14 +129,16 @@ impl Detectable for TagDetector {
         let regex = Regex::new(&regex).unwrap();
 
         // Match Regex and get groups
-        let groups = regex.captures(consumable.as_str())?;
+        let groups = match regex.captures(queue.as_str()) {
+            Ok(groups) => groups,
+            Err(_) => return None
+        }?;
 
         let (name, attributes) = extract_data(&groups);
 
         let tag = Tag::new(name, Some(attributes), &None::<Vec<Tag>>);
 
-        // Drain the matched string
-        consumable.drain(groups.get(0)?.range());
+        queue.drain(0..groups.name("tag").unwrap().end());
 
         Some((String::new(), tag))
     }
