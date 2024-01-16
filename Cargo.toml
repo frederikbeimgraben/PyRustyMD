@@ -13,3 +13,7 @@ regex = "1.10.2"
 [lib]
 crate-type = ["cdylib"]
 name = "pyrustymd"
+
+[[bin]]
+name = "debug"
+path = "src/debug.rs"

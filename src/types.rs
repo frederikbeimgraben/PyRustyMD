@@ -1,7 +1,7 @@
 // Types needed for the detection
 // -----------------------------------------------------------------------------------------------
 
-use std::{collections::HashMap, any::Any, fmt::Debug};
+use std::{collections::HashMap, any::Any, fmt::Debug, fmt::Display, result};
 
 use pyo3::{IntoPy, Python, PyObject, types::PyDict};
 
@@ -12,20 +12,20 @@ use crate::tag::Tag;
 // ===============================================================================================
 
 pub trait QueueTrait: Any + Debug + Clone {
-    fn consume(&mut self, detector: &Detector) -> Option<Result>;
+    fn consume(&mut self, detector: &(dyn Detectable)) -> Option<(String, Tag)>;
     fn next(&mut self) -> Option<char>;
-    fn consume_all(&mut self, detectors: Vec<&Detector>) -> Result;
+    fn consume_all(&mut self, detectors: Vec<&(dyn Detectable)>) -> Tag;
 }
 
 pub type Queue = String;
 
 impl QueueTrait for Queue {
-    fn consume(&mut self, detector: &Detector) -> Option<Result> {
+    fn consume(&mut self, detector: &(dyn Detectable)) -> Option<(String, Tag)> {
         let mut queue = self.clone();
 
         let result = detector.detect(&mut queue);
 
-        let consumed: usize = queue.len() - self.len();
+        let consumed: usize = self.len() - queue.len();
 
         match result {
             Some(result) => {
@@ -41,40 +41,54 @@ impl QueueTrait for Queue {
         self.chars().next()
     }
 
-    fn consume_all(&mut self, detectors: Vec<&Detector>) -> Result {
-        let mut results: Vec<Result> = vec![];
+    fn consume_all(&mut self, detectors: Vec<&(dyn Detectable)>) -> Tag {
+        let mut results: Vec<Tag> = vec![];
 
         let mut buffer: String = String::new();
 
         loop {
-            let det_results = detectors.iter().map(|detector| self.clone().consume(detector)).collect::<Vec<Option<Result>>>();
+            // Get the first result of the detectors which is not None
+            let mut first_result: Option<(Queue, Tag)> = None;
 
-            // Get the first result that is not None
-            let result = det_results.iter().find(|result| result.is_some());
+            let mut copy = self.clone();
 
-            match result {
-                Some(result) => {
+            for detector in &detectors {
+                copy = self.clone();
+
+                first_result = copy.consume(*detector);
+
+                if first_result.is_some() {
+                    break;
+                }
+            }
+
+            match first_result {
+                Some(mut result) => {
                     // Unpack buffer and push it to the results
                     if buffer.len() > 0 {
-                        let mut buffer_result = Result::new(
+                        let buffer_result = Tag::new(
+                            "raw".to_string(),
                             None,
-                            None,
-                            None,
-                            None,
-                            Some(buffer),
-                            None
+                            &buffer,
                         );
-
-                        buffer_result.flag(Flag::Raw);
 
                         results.push(buffer_result);
 
                         buffer = String::new();
                     }
 
-                    // Push the result to the results
-                    if let Some(result) = result.clone() {
-                        results.push(result);
+                    let consumed = self.len() - copy.len();
+
+                    // Remove the consumed characters from the queue
+                    self.drain(0..consumed);
+
+                    if result.0.len() > 0 {
+                        // Push the result to the results
+                        let inner_results = result.0.clone().consume_all(detectors.clone());
+
+                        result.1.children = Some(inner_results.children.unwrap_or(vec![]));
+
+                        results.push(result.1);
                     }
                 },
                 None => {
@@ -86,16 +100,11 @@ impl QueueTrait for Queue {
                         None => {
                             // Unpack buffer and push it to the results
                             if buffer.len() > 0 {
-                                let mut buffer_result = Result::new(
+                                let buffer_result = Tag::new(
+                                    "raw".to_string(),
                                     None,
-                                    None,
-                                    None,
-                                    None,
-                                    Some(buffer),
-                                    None
+                                    &buffer,
                                 );
-
-                                buffer_result.flag(Flag::Raw);
 
                                 results.push(buffer_result);
                             }
@@ -103,20 +112,18 @@ impl QueueTrait for Queue {
                             break;
                         }
                     }
+
+                    // Remove the first character of the queue
+                    self.drain(0..1);
                 }
             }
         }
 
-        let mut result = Result::new(
+        let result = Tag::new(
+            "root".to_string(),
             None,
-            None,
-            None,
-            None,
-            None,
-            Some(results)
+            &results,
         );
-
-        result.flag(Flag::Root);
 
         result
     }
@@ -132,149 +139,25 @@ pub enum Flag {
     Root
 }
 
-#[derive(Debug, Clone)]
-pub struct Result {
-    pub tag: Option<String>,
-    pub attributes: Dict,
-    pub options: Dict,
-    pub flags: HashMap<Flag, bool>,
-    pub content: Option<Queue>,
-    pub raw: Option<String>,
-    pub children: Option<Vec<Result>>
-}
-
-impl Result {
-    pub fn new(tag: Option<String>, attributes: Option<Dict>, options: Option<Dict>, content: Option<Queue>, raw: Option<String>, children: Option<Vec<Result>>) -> Self {
-        Self {
-            tag,
-            attributes: attributes.unwrap_or(Dict::new()),
-            options: options.unwrap_or(Dict::new()),
-            flags: HashMap::new(),
-            content,
-            raw,
-            children
-        }
-    }
-
-    // Accessors
-    /// Attributes
-    pub fn get_attribute(&self, key: &str) -> Value {
-        self.attributes.get(key)
-    }
-
-    pub fn set_attribute(&mut self, key: &str, value: &(dyn Any)) {
-        self.attributes.set(key, value);
-    }
-
-    pub fn get_attributes(&self) -> Dict {
-        self.attributes.clone()
-    }
-
-    pub fn set_attributes(&mut self, attributes: Dict) {
-        self.attributes = attributes;
-    }
-
-    pub fn has_attribute(&self, key: &str) -> bool {
-        self.attributes.has(key)
-    }
-
-    /// Options
-    pub fn get_option(&self, key: &str) -> Value {
-        self.options.get(key)
-    }
-
-    pub fn set_option(&mut self, key: &str, value: &(dyn Any)) {
-        self.options.set(key, value);
-    }
-
-    pub fn has_option(&self, key: &str) -> bool {
-        self.options.has(key)
-    }
-
-    /// Flags
-    pub fn flag(&mut self, key: Flag) {
-        self.flags.insert(key, true);
-    }
-
-    pub fn unflag(&mut self, key: Flag) {
-        self.flags.insert(key, false);
-    }
-
-    pub fn is_flagged(&self, key: Flag) -> bool {
-        match self.flags.get(&key) {
-            Some(flag) => *flag,
-            None => false
-        }
-    }
-}
-
-impl IntoPy<PyObject> for Result {
-    fn into_py(self, py: Python) -> PyObject {
-        let mut properties = Dict::new();
-
-        let children: Vec<Value> = match &self.children {
-            Some(children) => children.iter().map(|child| Value::Result(child.clone())).collect(),
-            None => vec![]
-        };
-
-        properties.set(
-            "tag",
-            &self.tag
-        );
-
-        properties.set(
-            "attributes",
-            &self.get_attributes()
-        );
-
-        properties.set(
-            "options",
-            &self.options
-        );
-
-        match self.is_flagged(Flag::Raw) {
-            true => {
-                self.content.unwrap_or(Queue::new()).to_string().into_py(py)
-            },
-            _ => {
-                properties.set(
-                    "content",
-                    &Value::Array(children)
-                );
-
-                properties.into_py(py)
-            }
-        }
-    }
-}
-
-impl PartialEq for Result {
-    fn eq(&self, other: &Self) -> bool {
-        self.tag == other.tag &&
-        self.attributes == other.attributes &&
-        self.options == other.options &&
-        self.flags == other.flags &&
-        self.content == other.content &&
-        self.raw == other.raw &&
-        self.children == other.children
-    }
-}
-
 // -----------------------------------------------------------------------------------------------
 // Detectable
 // -----------------------------------------------------------------------------------------------
 
-pub trait Detectable {
-    fn detect(&self, queue: &mut Queue) -> Option<Result>;
+pub trait Detectable: Debug {
+    fn detect(&self, queue: &mut Queue) -> Option<(Queue, Tag)>;
+    fn regex(&self, queue: &mut Queue) -> String {
+        String::new()
+    }
 }
 
+#[derive(Debug)]
 pub enum Detector<'a> {
     Any(&'a(dyn Detectable)),
     None
 }
 
 impl Detectable for Detector<'_> {
-    fn detect(&self, queue: &mut Queue) -> Option<Result> {
+    fn detect(&self, queue: &mut Queue) -> Option<(Queue, Tag)> {
         match self {
             Self::Any(detector) => detector.detect(queue),
             Self::None => None
@@ -299,13 +182,13 @@ pub enum Value {
 
     // Application Types
     Queue(Queue),
-    Result(Result),
     Tag(Tag),
 
     // Collections
     Dict(Dict),
     Array(Vec<Value>)
 }
+
 
 impl Value {
     pub fn new(ref value: &(dyn Any)) -> Self {
@@ -314,18 +197,38 @@ impl Value {
             value if value.is::<bool>()       => Self::Boolean(value.downcast_ref::<bool>().unwrap().clone()),
             value if value.is::<f64>()        => Self::Float(value.downcast_ref::<f64>().unwrap().clone()),
             value if value.is::<i64>()        => Self::Integer(value.downcast_ref::<i64>().unwrap().clone()),
-            value if value.is::<Queue>()      => Self::Queue(value.downcast_ref::<Queue>().unwrap().clone()),
             value if value.is::<Dict>()       => Self::Dict(value.downcast_ref::<Dict>().unwrap().clone()),
             value if value.is::<Vec<Value>>() => Self::Array(value.downcast_ref::<Vec<Value>>().unwrap().clone()),
-            value if value.is::<Result>()     => Self::Result(value.downcast_ref::<Result>().unwrap().clone()),
             value if value.is::<Tag>()        => Self::Tag(value.downcast_ref::<Tag>().unwrap().clone()),
 
-            // Array of any type
-            value if value.is::<Vec<&(dyn Any)>>() => {
+            // &str
+            value if value.is::<&str>() => {
+                let value = value.downcast_ref::<&str>().unwrap();
+
+                Self::String(value.to_string())
+            },
+
+            // Array of Tags
+            value if value.is::<Vec<Tag>>() => {
+                let input_array = value.downcast_ref::<Vec<Tag>>().unwrap();
+
                 let mut array: Vec<Value> = vec![];
 
-                for value in value.downcast_ref::<Vec<&(dyn Any)>>().unwrap() {
-                    array.push(Self::new(value));
+                for v in input_array {
+                    array.push(Self::Tag(v.clone()));
+                }
+
+                Self::Array(array)
+            },
+
+            // Array of Values
+            value if value.is::<Vec<Value>>() => {
+                let input_array = value.downcast_ref::<Vec<Value>>().unwrap();
+
+                let mut array: Vec<Value> = vec![];
+
+                for v in input_array {
+                    array.push(v.clone());
                 }
 
                 Self::Array(array)
@@ -334,8 +237,18 @@ impl Value {
             // Value
             value if value.is::<Value>() => value.downcast_ref::<Value>().unwrap().clone(),
 
+            // Option
+            value if value.is::<Option<&(dyn Any)>>() => {
+                let value = value.downcast_ref::<Option<&(dyn Any)>>().unwrap();
+
+                match value {
+                    Some(value) => Self::new(value),
+                    None => Self::NoneValue
+                }
+            },
+
             // Any other type
-            _ => Self::NoneValue,
+            value => Self::NoneValue
         }
     }
 
@@ -349,7 +262,6 @@ impl Value {
 
             // Application Types
             Self::Queue(queue) => Self::Queue(queue),
-            Self::Result(result) => Self::Result(result),
             Self::Tag(tag) => Self::Tag(tag),
 
             // Collections
@@ -370,7 +282,6 @@ impl Value {
             Self::Integer(number) => Some(number),
 
             // Application Types
-            Self::Result(result) => Some(result),
             Self::Queue(queue) => Some(queue),
             Self::Tag(tag) => Some(tag),
 
@@ -391,7 +302,6 @@ impl PartialEq for Value {
             (Self::Boolean(boolean_1), Self::Boolean(boolean_2)) => boolean_1 == boolean_2,
             (Self::Float(number_1), Self::Float(number_2)) => number_1 == number_2,
             (Self::Integer(number_1), Self::Integer(number_2)) => number_1 == number_2,
-            (Self::Result(result_1), Self::Result(result_2)) => result_1 == result_2,
             (Self::Queue(queue_1), Self::Queue(queue_2)) => queue_1 == queue_2,
             (Self::Dict(properties_1), Self::Dict(properties_2)) => properties_1 == properties_2,
             (Self::NoneValue, Self::NoneValue) => true,
@@ -407,9 +317,6 @@ impl IntoPy<PyObject> for Value {
             Self::Boolean(boolean) => boolean.into_py(py),
             Self::Float(number) => number.into_py(py),
             Self::Integer(number) => number.into_py(py),
-            Self::Result(result) => {
-                result.into_py(py)
-            },
             Self::Queue(queue) => queue.to_string().into_py(py),
             Self::Dict(properties) => properties.into_py(py),
             Self::Tag(tag) => tag.into_py(py),
@@ -423,6 +330,37 @@ impl IntoPy<PyObject> for Value {
                 substrings.into_py(py)
             },
             Self::NoneValue => py.None()
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            // Primitive Types
+            Self::String(string) => write!(f, "{}", string),
+            Self::Boolean(boolean) => write!(f, "{}", boolean),
+            Self::Float(number) => write!(f, "{}", number),
+            Self::Integer(number) => write!(f, "{}", number),
+
+            // Application Types
+            Self::Queue(queue) => write!(f, "{}", queue),
+            Self::Tag(_) => write!(f, "Tag(...)"),
+
+            // Collections
+            Self::Dict(_) => write!(f, "{{...}}"),
+            Self::Array(array) => {
+                let mut substrings: Vec<String> = vec![];
+
+                for value in array {
+                    substrings.push(format!("{}", value));
+                }
+
+                write!(f, "[{}]", substrings.join(", "))
+            },
+
+            // None
+            Self::NoneValue => write!(f, "None")
         }
     }
 }
@@ -463,10 +401,13 @@ impl Dict {
         properties
     }
 
-    pub fn get(&self, key: &str) -> Value {
+    pub fn get(&self, key: &str) -> Option<Value> {
         let value = self.properties.get(key);
 
-        value.unwrap_or(&Value::NoneValue).clone()
+        match value {
+            Some(value) => Some(value.clone()),
+            None => None
+        }
     }
 
     pub fn set(&mut self, key: &str, value: &(dyn Any)) {
@@ -492,6 +433,15 @@ impl Dict {
     pub fn empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn remove(&mut self, key: &str) {
+        self.properties.remove(key);
+    }
+
+    // Iter
+    pub fn iter(&self) -> Dict {
+        self.clone()
+    }
 }
 
 impl PartialEq for Dict {
@@ -501,7 +451,7 @@ impl PartialEq for Dict {
                 return false;
             }
 
-            if other.get(key) != *value {
+            if other.get(key).unwrap_or(Value::NoneValue) != *value {
                 return false;
             }
         }
@@ -524,5 +474,19 @@ impl IntoPy<PyObject> for Dict {
         }
 
         dict.into_py(py)
+    }
+}
+
+impl Iterator for Dict {
+    type Item = (String, Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let properties = self.properties.clone();
+
+        let (key, value) = properties.iter().next().unwrap();
+
+        self.properties.remove(key);
+
+        Some((key.clone(), value.clone()))
     }
 }

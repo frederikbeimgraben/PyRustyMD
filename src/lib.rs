@@ -7,6 +7,7 @@ pub mod tags;
 
 use pyo3::prelude::*;
 
+use tags::tag_scope_detector::TagScopeDetector;
 use types::{Queue, QueueTrait};
 
 #[pyfunction]
@@ -14,7 +15,9 @@ fn parse(input: &str) -> PyResult<PyObject> {
     let mut consumable: Queue = Queue::from(input);
 
     let result = consumable.consume_all(
-        vec![]
+        vec![
+            &TagScopeDetector::new(None, None, None, None, None),
+        ]
     );
 
     let py_gil = Python::acquire_gil();
