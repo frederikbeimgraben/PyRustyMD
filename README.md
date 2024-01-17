@@ -90,12 +90,23 @@ Then just import it in your python script having the same virtualenv activated.
 
 ## Meta
 
-Frederik Beimgraben – 
-    [Website](https://beimgraben.net) |
-    [GitHub](https://github.com/frederikbeimgraben)
+[![Website](
+    https://img.shields.io/badge/My_Website-Beimgraben.NET-orange?logo=firefox&logoColor=orange&labelColor=white&style=social
+)](https://beimgraben.net)
+[![GitHub followers](
+    https://img.shields.io/github/followers/frederikbeimgraben?label=Follow&style=social
+)](https://github.com/frederikbeimgraben/)
+[![PGP](
+    https://img.shields.io/badge/PGP-0x9D6D6D6C-blue?logo=monkeytie&logoColor=black&labelColor=white&style=social
+)](https://keybase.io/beimgraben/pgp_keys.asc)
+
+[![PixelCampus](
+    https://img.shields.io/badge/-PixelCampus.Space-blue?logo=minetest&logoColor=blue&labelColor=white&style=social
+)](https://pixelcampus.space)
+[![PixelCampus](
+    https://img.shields.io/badge/-PixelCampus-white?logo=github&logoColor=black&style=social
+)](https://github.com/frederikbeimgraben/PixelCampus)
+
+## License
 
 Distributed under the GPL-3.0 license. See ``LICENSE`` for more information.
-
-PixelCampus – 
-    [Website](https://pixelcampus.space) |
-    [GitHub](https://github.com/frederikbeimgraben/PixelCampus)
