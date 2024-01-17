@@ -5,7 +5,7 @@
 [![forthebadge](https://forthebadge.com/images/badges/made-with-rust.svg)](https://forthebadge.com)
 
 [![CI](https://github.com/frederikbeimgraben/PyRustyMD/actions/workflows/CI.yml/badge.svg)](https://github.com/frederikbeimgraben/PyRustyMD/actions/workflows/CI.yml/badge.svg)
-[![PyPI](https://shields.io/badge/PyPI-Package-blue)](https://pypi.org/project/pyrustymd/)
+[![PyPI](https://shields.io/badge/PyPI-Package-yellow?logo=python&logoColor=white&labelColor=blue)](https://pypi.org/project/pyrustymd/)
 
 ## Features
 - [ ] Parse Markdown
