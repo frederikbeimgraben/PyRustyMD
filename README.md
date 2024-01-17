@@ -1,6 +1,12 @@
 # [PyRustyMD](https://github.com/frederikbeimgraben/PyRustyMD)
 > WIP! Markdown Parser written in Rust for the PixelCampus.space Wiki to support custom tags and other features.
 
+[![forthebadge](https://forthebadge.com/images/badges/0-percent-optimized.svg)](https://forthebadge.com)
+[![forthebadge](https://forthebadge.com/images/badges/made-with-rust.svg)](https://forthebadge.com)
+
+[![CI](https://github.com/frederikbeimgraben/PyRustyMD/actions/workflows/CI.yml/badge.svg)](https://github.com/frederikbeimgraben/PyRustyMD/actions/workflows/CI.yml/badge.svg)
+[![PyPI](https://shields.io/badge/PyPI-Package-blue)](https://pypi.org/project/pyrustymd/)
+
 ## Features
 - [ ] Parse Markdown
 - [x] Parse HTML-Style Tags
